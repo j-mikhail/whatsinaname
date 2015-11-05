@@ -219,7 +219,7 @@ Doc|X|Y
 3|0.6|0.2
 4|0.1|0.5
 
-![Simple XY plot](/graph/simple-xy.png)
+![Simple XY plot](/graphs/simple-xy.png)
 
 However, because we are working with matrices, SVM and similar functions must use either a *one-versus-one* or *one-versus-all* (also called *one-versus-many* or *one-versus-rest*) approach. To better understand that, take the following grid:
 
