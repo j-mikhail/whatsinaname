@@ -211,21 +211,24 @@ More information on the performance advantages of sparse matrices can be found [
 With our container, we now ready to pick a model and begin training and classifying. I'll be using SVM, or Support Vector Machine, as a baseline model for analysis. SVM was originally a linear classifier, but has been expanded to include non-linear functions. Two great tutorials on SVM can be found [here](https://lagunita.stanford.edu/c4x/HumanitiesandScience/StatLearning/asset/ch9.html) and [here](http://cbio.ensmp.fr/~jvert/svn/tutorials/practical/svmbasic/svmbasic_notes.pdf).
 
 Understanding the mathematics behind SVM, which its [Wikipedia article](https://en.wikipedia.org/wiki/Support_vector_machine) summarizes, can be difficult without significant higher education in that field. But at its most basic level, it's important to understand that SVM works by attempting to map data to *hyperplanes*, that is, two-or-higher-dimensional grids. For the purpose of this explanation, we will be using simple two-dimensional, X and Y grids to try to outline the process. So, given any set of X and Y coordinates, mapping these on a grid would be easy. For example:
-| |X|Y
-|---|---|---
-|1|0.3|0.6
-|2|0.4|0.7
-|3|0.6|0.2
-|4|0.1|0.5
+
+Doc|X|Y
+---|---|---
+1|0.3|0.6
+2|0.4|0.7
+3|0.6|0.2
+4|0.1|0.5
+
 ![Simply X-Y plot](/graph/simple-xy.png)
 
 However, because we are working with matrices, SVM and similar functions must use either a *one-versus-one* or *one-versus-all* (also called *one-versus-many* or *one-versus-rest*) approach. To better understand that, take the following grid:
-| |A|B|C|D
-|---|---|---|---|---
-|1|0.3|0.6|0.2|0.4
-|2|0.4|0.7|0.5|0.3
-|3|0.6|0.2|0.1|0.5
-|4|0.1|0.5|0.3|0.2
+Doc|A|B|C|D
+---|---|---|---|---
+1|0.3|0.6|0.2|0.4
+2|0.4|0.7|0.5|0.3
+3|0.6|0.2|0.1|0.5
+4|0.1|0.5|0.3|0.2
+
 How would you graph this table? From a mathematical perspective, you could use a four-dimensional hyperplane. However, for us mere mortals, there is no practical way to visualize these points meaningfully. So in a one-versus-one approach, you would first plot A vs B, and run your model on that, then A vs C, A vs D, B vs C and so on until you've gone through every combination, and from those results, select the class selected by most classifiers. On a matrix like ours, with 3,262 columns, this would be an incredibly time-consuming task, requiring 5,318,691 plots. But let's take a look at what one of those plots might look like:
 ```r
 plot(as.matrix(data_container_tfidf@training_matrix)[,1:2], col = as.numeric(factor(data_rnd$genre)), xlab=data_container_tfidf@column_names[1], ylab=data_container_tfidf@column_names[2], title="One-versus-one plot of two first columns")
