@@ -1,10 +1,10 @@
 # What's in a name?
-##### A machine learning and text mining experiment
+##### A machine learning exercise on multiclass classification of natural language
 by Jonathan Mikhail
 
 ### Background
 
-Ask fans to describe the plot of “The Dark Knight”, “Die Hard” or “Scarface”, and they can usually do so quickly and comprehensively. But are movie plots simply a random description of a story, divorced from its genre, or is there a pattern which correlates these features? I would like to perform analysis to determine whether such a correlation exists, whether a classification model can be built from it, and whether this model can be used to predict a movie’s genre based only on its plot.
+Ask fans to describe the plot of of their favorite movie, and they can usually do so quickly and comprehensively. But are movie plots simply a random description of a story, divorced from its genre, or is there a pattern which correlates these features? I would like to perform analysis to determine whether such a correlation exists, whether a classification model can be built from it, and whether this model can be used to predict a movie’s genre based only on its plot.
 
 ### Literature
 
@@ -17,6 +17,8 @@ The following papers may be of interest:
 * [*Obtaining calibrated probability estimates from decision trees and naive Bayesian classifiers*](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.29.3039&rep=rep1&type=pdf) by Bianca Zadrozny, Charles Elkan
 * [*A Tutorial on Support Vector Machines for Pattern Recognition*](http://research.microsoft.com/pubs/67119/svmtutorial.pdf) by Christopher J.C. Burges
 * [*Scorecard construction with unbalanced class sizes*](http://fic.wharton.upenn.edu/fic/handpaper.pdf) by David J. Hand, Veronica Vinciotti
+* [*Visualisation of multi-class ROC surfaces*](http://users.dsic.upv.es/~flip/ROCML2005/papers/fieldsend2CRC.pdf) by Jonathan E. Fieldsend, Richard M. Everson
+* [*Approximating the multiclass ROC by pairwise analysis*](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.108.3250&rep=rep1&type=pdf) by Thomas C.W. Landgrebe, Robert P.W. Duin
 
 ### Data Source
 
@@ -64,12 +66,12 @@ This is a quick fix in Notepad++ by simply searching for **(\t+)** and replacing
 
 Once we have our documents in a clean, tab-delimited format, importing them into R is pretty easy:
 ```r
-> data_ratings <- read.delim("./GitHub/whatsinaname/data/cleaned/ratings.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("rcount","rating","title"))
-> data_languages <- read.delim("./GitHub/whatsinaname/data/cleaned/language.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","language","variant"))
-> data_countries <- read.delim("./GitHub/whatsinaname/data/cleaned/countries.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","country"))
-> data_running_times <- read.delim("./GitHub/whatsinaname/data/cleaned/running-times.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","time","note"))
-> data_genres <- read.delim("./GitHub/whatsinaname/data/cleaned/genres.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","genre"))
-> data_plot <- read.delim("./GitHub/whatsinaname/data/cleaned/plot.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","plot"))
+data_ratings <- read.delim("./GitHub/whatsinaname/data/cleaned/ratings.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("rcount","rating","title"))
+data_languages <- read.delim("./GitHub/whatsinaname/data/cleaned/language.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","language","variant"))
+data_countries <- read.delim("./GitHub/whatsinaname/data/cleaned/countries.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","country"))
+data_running_times <- read.delim("./GitHub/whatsinaname/data/cleaned/running-times.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","time","note"))
+data_genres <- read.delim("./GitHub/whatsinaname/data/cleaned/genres.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","genre"))
+data_plot <- read.delim("./GitHub/whatsinaname/data/cleaned/plot.tabbed.txt", header = FALSE, sep = "\t", quote=NULL, col.names = c("title","plot"))
 ```
 
 ### Data Structuring
@@ -77,31 +79,31 @@ Once we have our documents in a clean, tab-delimited format, importing them into
 ##### Merging
 Since R creates a separate data frame for each imported file, we can now merge these into a unified data frame by matching on title:
 ```r
-> data_all <- data.frame(data_ratings["title"], data_ratings["rating"], data_ratings["rcount"])
-> data_all <- merge(data_all, data_running_times, by.x = "title", by.y = "title")
-> data_all <- merge(data_all, data_languages, by.x = "title", by.y = "title")
-> data_all <- merge(data_all, data_countries, by.x = "title", by.y = "title")
-> data_all <- merge(data_all, data_genres, by.x = "title", by.y = "title")
-> data_all <- merge(data_all, data_plot, by.x = "title", by.y = "title")
+data_all <- data.frame(data_ratings["title"], data_ratings["rating"], data_ratings["rcount"])
+data_all <- merge(data_all, data_running_times, by.x = "title", by.y = "title")
+data_all <- merge(data_all, data_languages, by.x = "title", by.y = "title")
+data_all <- merge(data_all, data_countries, by.x = "title", by.y = "title")
+data_all <- merge(data_all, data_genres, by.x = "title", by.y = "title")
+data_all <- merge(data_all, data_plot, by.x = "title", by.y = "title")
 ```
 ##### Filtering
 Our merges have produced a sizeable data frame, however not all the data contained is pertinent. For simplicity's sake, we would like to restrict our analysis to English language, American-produced theatrical films, with at least 100 ratings.
 
 Another important note is that movies are categorized into several different genres. However, as multi-classification is a somewhat more involved process, we will be limiting each movie to a single genre. The following commands accomplish our filtering needs:
 ```r
-> data_all <- subset(data_all, !duplicated(title)) # Single genre per movie
-> data_all <- subset(data_all, language == "English") # English only
-> data_all <- subset(data_all, country == "USA") # USA only
-> data_all <- subset(data_all, !grepl("(TV)|(V)|(VG)", title)) # No TV shows, straight-to-videos or video games
-> data_all <- subset(data_all, !grepl("Adult|Erotica", genre)) # No porn
-> data_all <- subset(data_all, note == "") # No regional edits
-> data_all <- subset(data_all, rcount >= 100) # Only movies with at least 100 reviews
+data_all <- subset(data_all, !duplicated(title)) # Single genre per movie
+data_all <- subset(data_all, language == "English") # English only
+data_all <- subset(data_all, country == "USA") # USA only
+data_all <- subset(data_all, !grepl("(TV)|(V)|(VG)", title)) # No TV shows, straight-to-videos or video games
+data_all <- subset(data_all, !grepl("Adult|Erotica", genre)) # No porn
+data_all <- subset(data_all, note == "") # No regional edits
+data_all <- subset(data_all, rcount >= 100) # Only movies with at least 100 reviews
 ```
 ##### Sampling
 While we now have a workable data set, the records are still all in alphabetical order, which could skew the results of our modelling. As such, the final step is to randomize the records. It's also prudent to save a copy of these results in case we need to reproduce the same results later:
 ```r
-> data_rnd <- data_all[sample(nrow(data_all)),] # Randomize records
-> write.csv(data_rnd, "Clean-Random-Data.csv") # Save randomized records
+data_rnd <- data_all[sample(nrow(data_all)),] # Randomize records
+write.csv(data_rnd, "Clean-Random-Data.csv") # Save randomized records
 ```
 
 ### Data Modelling
@@ -119,8 +121,8 @@ Scoring is typically done by weighing the words using either TF, term frequency,
 
 In R, we can facilitate these tasks using any number of libraries. I have selected to use the **tm** and [**RTextTools**](http://www.rtexttools.com/documentation.html) libraries. Using our previously randomized data, we can create a weighing matrix like so:
 ```r
-> library("tm")
-> library("RTextTools")
+library("tm")
+library("RTextTools")
 
 data_matrix_tf <- create_matrix(data_rnd$plot, language = "english", stemWords = TRUE, removeStopwords = TRUE, removeNumbers = TRUE, removePunctuation = TRUE, removeSparseTerms = 0.998, weighting = weightTf) # Create matrix
 ```
@@ -144,7 +146,7 @@ Many terms have been stemmed, "divid" for example. We can see that "dollar" appe
 
 However, since TF is considered less representative than TD-IDF, we will create a new matrix using TD-IDF and compare the differences:
 ```r
-> data_matrix_tfidf <- create_matrix(data_rnd$plot, language = "english", stemWords = TRUE, removeStopwords = TRUE, removeNumbers = TRUE, removePunctuation = TRUE, removeSparseTerms = 0.998, weighting = weightTfIdf) # Create matrix
+data_matrix_tfidf <- create_matrix(data_rnd$plot, language = "english", stemWords = TRUE, removeStopwords = TRUE, removeNumbers = TRUE, removePunctuation = TRUE, removeSparseTerms = 0.998, weighting = weightTfIdf) # Create matrix
 ```
 Now we can see some subtle differences:
 ```text
@@ -164,7 +166,7 @@ Docs          navi      navig       nazi       near     nearbi  necessari       
 
 It's important to note that both these functions create a *sparse* matrix. That is, if we have, as we've said, 18,898 documents with 3,262 features, we would normally require a matrix of 18,898 x 3,262 = 61,645,276 cells to store every possible value. However, since most of those values will be zero, we can use a sparse matrix to store only non-zero values and infer the rest, reducing the number of required cells in this case to 668,825 and lowering memory consumption considerably. This can be verified by viewing the matrix:
 ```r
-> data_matrix_tfidf
+data_matrix_tfidf
 ```
 ```text
 <<DocumentTermMatrix (documents: 18898, terms: 3262)>>
@@ -181,7 +183,7 @@ find_most_freq <- function(doc_num, how_many) {
 ```
 So if we wanted to see the top five features for the first document of our corpus, we can just run:
 ```r
-> find_most_freq(1,5)
+find_most_freq(1,5)
 ```
 ```text
   compani  industri    enough  idealist       rat 
@@ -191,7 +193,7 @@ So if we wanted to see the top five features for the first document of our corpu
 ### Training
 With our matrix in hand, the next step is to create a data container, a means to tell R how to train and test our matrix data:
 ```r
-> data_container_tfidf <- create_container(data_matrix_tfidf, as.numeric(factor(data_rnd$genre)), trainSize=1:4000, testSize = 16001:18898, virgin = FALSE) # Factorization of class is necessary or analysis will fail later
+data_container_tfidf <- create_container(data_matrix_tfidf, as.numeric(factor(data_rnd$genre)), trainSize=1:4000, testSize = 16001:18898, virgin = FALSE) # Factorization of class is necessary or analysis will fail later
 ```
 With this command, we are instructing R to take the matrix of our 18,898 movies and their features, and to model the data using our classes, in this case the genres of the individual movies, using the first 4000 records for training and the last 2,898 records for testing. Because classification is normally done on numeric values, we "factorize" the genres, that is we assign each of the 31 genres a number and use that number as the class.
 
@@ -199,17 +201,18 @@ If you peek into our container, you will now find two matrices, one for training
 
 Again, these matrices are stored as sparse matrices, because of the high incidence of zero entries. However, we can visualize our sparse matrix to give a better sense of where our values exist, with each non-zero value represented by a grey dot:
 ```r
-> library("SparseM")
-> image(as.matrix.csr(data_container_tfidf@training_matrix), xlab="Terms", ylab="Documents")
-> title("TD-IDF Scoring of Terms by Document")
+library("SparseM")
+image(as.matrix.csr(data_container_tfidf@training_matrix), xlab="Terms", ylab="Documents")
+title("TD-IDF Scoring of Terms by Document")
 ```
 ![Training Sparse Matrix Graph](/graphs/training-sparse-matrix.png)
 
 More information on the performance advantages of sparse matrices can be found [here](http://www.johnmyleswhite.com/notebook/2011/10/31/using-sparse-matrices-in-r/).
 
 ### Support Vector Machine
-With our container, we now ready to pick a model and begin training and classifying. I'll be using SVM, or Support Vector Machine, as a baseline model for analysis. SVM was originally a linear classifier, but has been expanded to include non-linear functions. Two great tutorials on SVM can be found [here](https://lagunita.stanford.edu/c4x/HumanitiesandScience/StatLearning/asset/ch9.html) and [here](http://cbio.ensmp.fr/~jvert/svn/tutorials/practical/svmbasic/svmbasic_notes.pdf).
+With our container, we now ready to pick a model and begin training and classifying. I'll be using SVM, or Support Vector Machine, as a baseline algorithm for analysis. SVM was originally a linear classifier, but has been expanded to include non-linear functions. Two great tutorials on SVM can be found [here](https://lagunita.stanford.edu/c4x/HumanitiesandScience/StatLearning/asset/ch9.html) and [here](http://cbio.ensmp.fr/~jvert/svn/tutorials/practical/svmbasic/svmbasic_notes.pdf).
 
+##### Hyperplanes
 Understanding the mathematics behind SVM, which its [Wikipedia article](https://en.wikipedia.org/wiki/Support_vector_machine) summarizes, can be difficult without significant higher education in that field. But at its most basic level, it's important to understand that SVM works by attempting to map data to *hyperplanes*, that is, two-or-higher-dimensional grids. For the purpose of this explanation, we will be using simple two-dimensional, X and Y grids to try to outline the process. So, given any set of X and Y coordinates, mapping these on a grid would be easy. For example:
 
 Doc|X|Y
@@ -221,7 +224,7 @@ Doc|X|Y
 
 ![Simple XY plot](/graphs/simple-xy.png)
 
-However, because we are working with matrices, SVM and similar functions must use either a *one-versus-one* or *one-versus-all* (also called *one-versus-many* or *one-versus-rest*) approach. To better understand that, take the following grid:
+However, now take the following grid:
 
 Doc|A|B|C|D
 ---|---|---|---|---
@@ -230,7 +233,7 @@ Doc|A|B|C|D
 3|0.6|0.2|0.1|0.5
 4|0.1|0.5|0.3|0.2
 
-How would you graph this table? From a mathematical perspective, you could use a four-dimensional hyperplane. However, for us mere mortals, there is no practical way to visualize these points meaningfully. So in a one-versus-one approach, you would first plot A vs B, and run your model on that, then A vs C, A vs D, B vs C and so on until you've gone through every combination, and from those results, select the class selected by most classifiers. On a matrix like ours, with 3,262 columns, this would be an incredibly time-consuming task, requiring 5,318,691 plots. But let's take a look at what one of those plots might look like:
+How would you graph this table? From a mathematical perspective, you could use a four-dimensional hyperplane. However, for us mere mortals, there is no practical way to visualize these points meaningfully. Accordingly, if we do want to plot our data, we must limit ourselves to two or three features. I'll be using two for the sake of clarity, which would look something like this:
 ```r
 plot(as.matrix(data_container_tfidf@training_matrix)[,1:2], col = as.numeric(factor(data_rnd$genre)), xlab=data_container_tfidf@column_names[1], ylab=data_container_tfidf@column_names[2], title="One-versus-one plot of two first columns")
 title("Plot of two first columns of training matrix")
@@ -239,7 +242,7 @@ title("Plot of two first columns of training matrix")
 
 It's not particularly interesting, since most values are zero, and for our two first terms, *abbi* and *abandon*, there are no documents that are non-zero for both terms. So let's look for some more popular terms:
 ```r
-> head(sort(apply(as.matrix(data_container_tfidf@training_matrix), 2, function(c)sum(c!=0)), decreasing = T, index.return = T)$ix, 5)
+head(sort(apply(as.matrix(data_container_tfidf@training_matrix), 2, function(c)sum(c!=0)), decreasing = T, index.return = T)$ix, 5)
 ```
 ```text
 [1] 1231 1111 2022 1963 1693
@@ -251,49 +254,43 @@ title("Plot of two most populated columns of training matrix")
 ```
 ![Plot of two most populated columns of training matrix](/graphs/plot-popular-columns.png)
 
-This produces a much more interesting result, but given the multiple classes and divergent data, can suggest some of the challenges in applying SVM to our data. Nevertheless, computers are experts at repetitive, time-consuming tasks, and so let's compare both the original SVM linear function and the popular SVM Gaussian non-linear function, letting R decide the default parameters for each:
+This produces a much more visually interesting result. Now, while we can see from the rainbow of colours that all of our classes are displayed, this process isn't actually representative of how modelling works. Because SVM and similar functions operate primarily on binary classification, we must use either a *one-versus-one* or *one-versus-all* (also called *one-versus-many* or *one-versus-rest*) approach. In layman's terms, this just means that the modelling is run only on two classes at a time. So, in a one-versus-one approach of our example, you would first plot Action vs Adventure, and run your model on that, then Action vs Animation, Action vs Biography, and so on all the way through War vs Western, until you've gone through every possible combination (*not* permutation), and from those results, select the class selected by most classifiers.
+
+##### Modelling
+So because our wonderful computers can perform 3,262-dimensional hyperplane mathematics, let's compare both the original SVM linear function and the popular SVM Gaussian non-linear function, letting R decide the default parameters for each:
 ```r
-> train_SVM_linear <- train_model(data_container_tfidf, "SVM", kernel = "linear")
-> class_SVM_linear <- classify_model(data_container_tfidf, train_SVM_linear)
+train_SVM_linear <- train_model(data_container_tfidf, "SVM", kernel = "linear")
+class_SVM_linear <- classify_model(data_container_tfidf, train_SVM_linear)
 
-> train_SVM_radial <- train_model(data_container, "SVM", kernel = "radial") #Gaussian
-> class_SVM_radial <- classify_model(data_container_tfidf, train_SVM_radial)
+train_SVM_radial <- train_model(data_container_tfidf, "SVM", kernel = "radial") #Gaussian
+class_SVM_radial <- classify_model(data_container_tfidf, train_SVM_radial)
 
-> head(cbind(class_SVM_linear, class_SVM_radial), 15)
+head(cbind(class_SVM_linear, class_SVM_radial), 15)
 ```
 ```text
    SVM_LABEL  SVM_PROB SVM_LABEL  SVM_PROB
-1          5 0.2680421         5 0.2576749
-2         23 0.2048374         5 0.2476217
-3          8 0.2434515         5 0.2394585
-4          5 0.2726620         5 0.2521533
-5         21 0.2418776         5 0.2596507
-6         14 0.4467603         5 0.2341590
-7          8 0.3230210         5 0.2300045
-8          5 0.2197894         5 0.2518738
-9         21 0.2466669         5 0.2493218
-10         5 0.2321563         5 0.2484624
-11        23 0.2348757         5 0.2307431
-12         8 0.1861349         5 0.2629878
-13         8 0.3796116         5 0.2469428
-14         8 0.2626149         5 0.2461823
-15         8 0.2752718         5 0.2558068
+1          5 0.2703888         5 0.2386189
+2         23 0.2036409        14 0.2975648
+3          8 0.2447899         8 0.2886877
+4          5 0.2812845         5 0.2658454
+5         21 0.2463995        21 0.1769495
+6         14 0.4506533        14 0.2748334
+7          8 0.3280318         8 0.3149284
+8          5 0.2132786         5 0.2263889
+9         21 0.2752117         5 0.2310229
+10         5 0.2304026         8 0.3085733
+11        23 0.2359380        23 0.2126839
+12        16 0.1768736         5 0.2409772
+13         8 0.3900510         8 0.3704462
+14         8 0.2682525         8 0.2469519
+15         8 0.2760122         8 0.2949235
 ```
-As we can see from the results, the linear function, shown in the first two columns, classified a variety of classes, albeit with relatively low confidence. The Gaussian function, however, classified every document in our sample to the same class, with little improvement in confidence.
-```r
-> unique(class_SVM_linear$SVM_LABEL)
-> unique(class_SVM_radial$SVM_LABEL)
-```
-```text
-[1] 5  23 8  21 14 7  1  24 20 25 15 6  9  3  4  2  22 19 17 16 10 11
-Levels: 1 10 11 14 15 16 17 19 2 20 21 22 23 24 25 3 4 5 6 7 8 9
+As we can see from the results, both kernels performed similarly, with mixed but generally low probabilities. We can also note that records were predominantly sorted into classes 5 and 8.
 
-[1] 5 8
-Levels: 5 8
-```
-In fact, while the linear function used nearly every class, the Gaussian function classified everything to one of two classes, 5 and 8. This is obviously not ideal, but it is expected; according to this [research paper](http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=1527706&url=http%3A%2F%2Fieeexplore.ieee.org%2Fstamp%2Fstamp.jsp%3Ftp%3D%26arnumber%3D1527706), training sets with uneven class sizes results in biases towards classes with larger training sizes. Let's take a look at the class of our first 4,000 documents:
+##### Class Biasing
+According to this [research paper](http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=1527706&url=http%3A%2F%2Fieeexplore.ieee.org%2Fstamp%2Fstamp.jsp%3Ftp%3D%26arnumber%3D1527706), training sets with uneven class sizes results in biases towards classes with larger training sizes. So is that what is happening here? Let's take a look at the classes of our first 4,000 documents:
 ```r
-> table(head(data_rnd$genre, 4000))
+table(head(data_rnd$genre, 4000))
 ```
 ```text
 
@@ -304,7 +301,60 @@ In fact, while the linear function used nearly every class, the Gaussian functio
    Thriller         War     Western 
         266          37         109 
 ```
-As expected, the 5th and 8th classes, Comedy and Drama, have much higher occurrences than any of the other classes, which explains the biasing of our Gaussian function. So let's step back and once again try to understand what's happening under the hood here. We can use R's e1071 library to better step through SVM's linear performance.
+We can also visualize this data:
+```r
+# Histogram of genre distribution
+data_block <- head(data_rnd$genre, 4000)
+par(xaxt="n") # Turn off horizontal axis labels
+plot(data_block, type="h", main = "Distribution of genres in first block") # Draw plot
+par(xaxt="s") # Turn back on horizontal axis labels
+axis(1, at=seq(par("xaxp")[1], par("xaxp")[2], by=(par("xaxp")[2]-par("xaxp")[1])/(length(unique(data_block))+1)), labels = FALSE) # Draw horizontal ticks
+incr <- (par("xaxp")[2]-par("xaxp")[1])/(length(unique(data_block))+1) # Calculate distance between bars
+text(x = seq(par("xaxp")[1]+incr, par("xaxp")[2], by=incr), y = -20, labels = sort(unique(data_rnd$genre)), srt = 90, pos = 2, xpd = TRUE, cex = 0.8) # Write horizontal labels
+```
+![Distribution of genres in first block](/graphs/hist-genres.png)
+
+As suspected, the 5th and 8th classes, Comedy and Drama, have much higher occurrences than any of the other classes. However, does that imnply a biasing of our classification? It's possible given that, as we said earlier, in our one-versus-one approach, these two classes are most likely to be selected by the most classifiers. 
+
+##### Results
+So, overall, how well did we do?
+```r
+anals_SVM_linear <- create_analytics(data_container_tfidf, class_SVM_linear)
+summary(anals_SVM_linear)
+anals_SVM_radial <- create_analytics(data_container_tfidf, class_SVM_radial)
+summary(anals_SVM_radial)
+```
+Kernel|Precision|Recall|FScore
+---|---|---|---
+Linear|0.2141667|0.1545833|0.1620833 
+Gaussian|0.2079167|0.1529167|0.1541667 
+
+Once again we can see that both kernels performed similarly, with a very slight advantage given to the linear classification. In both cases, our precision is approximately 21% and our recall is approximately 15%. But what's our overall accuracy?
+```r
+table(anals_SVM_linear@document_summary$SVM_LABEL == anals_SVM_linear@document_summary$MANUAL_CODE)
+table(anals_SVM_radial@document_summary$SVM_LABEL == anals_SVM_radial@document_summary$MANUAL_CODE)
+```
+```text
+FALSE  TRUE 
+ 2003   895 
+ 
+FALSE  TRUE 
+ 1963   935 
+```
+Ultimately, our linear accuracy is 895 / 2898 = 0.018, or roughly 31%, compared to 32% for the Gaussian. At first glance, these numbers might seem low, but they must be contrasted against results from random chance, which would be approximately 1 in 25, or 4%, given equal probabilities for all classes. We can visualize these results using a confusion matrix heatmap, using our linear kernel as an example, but because of some trickery with how R factorizes its labels, we must apply an unfactor function:
+```r
+unfactor <- function(obj) {
+  unfactor <- as.numeric(levels(obj)[as.integer(obj)])
+}
+
+heatmap(table(unfactor(anals_SVM_linear@document_summary$SVM_LABEL), anals_SVM_linear@document_summary$MANUAL_CODE)[length(unique(unfactor(anals_SVM_linear@document_summary$SVM_LABEL))):1,], Rowv = NA, Colv = NA, col = heat.colors(256))
+```
+![Linear Kernel Confusion Matrix Heatmap](/graphs/heatmap-svm-linear.png)
+
+The diagonal line of lighter cells across the square represents our true positives. Under normal circumstances, we could also plot and analyse the area under the curve (AUC); however, as explained earlier, a pairwise one-versus-one approach would be required to properly assess each class' performance, and multiclass ROC curves are still an evolving (and disputed) process. So we'll skip this for now.
+
+##### Visualizing Classification
+Instead, let's step back and once again try to understand what's happening under the hood here. We can use R's e1071 library to better step through SVM's linear performance.
 ```r
 library(e1071)
 data_for_svm <- data.frame(X1 = as.matrix(data_container_tfidf@training_matrix)[, 1111], X2 = as.matrix(data_container_tfidf@training_matrix)[, 1231], y = as.factor(data_rnd$genre[1:4000]))
@@ -314,7 +364,7 @@ mtext(side = 3, text = "Linear, all genres, all records", line = 0.6)
 ```
 ![SVM classification plot, linear, all genres, all records](/graphs/plot-linear-allg-allr.png)
 
-We can in the color shading that the results have been biased to the same two classes. As well, if we remember our sparse matrix graph from earlier, many entries exist that are zero for both terms, which could further bias our results. So what happens if we remove these entries?
+We can see by the color shading that the results have been biased to the same two classes. As well, if we remember our sparse matrix graph from earlier, many entries exist that are zero for both terms, which could further bias our results. So what happens if we remove these entries?
 ```r
 data_for_svm <- data.frame(X1 = as.matrix(data_container_tfidf@training_matrix)[, 1111], X2 = as.matrix(data_container_tfidf@training_matrix)[, 1231], y = as.factor(data_rnd$genre[1:4000]))
 data_for_svm <- subset(data_for_svm, X1 != 0 | X2 != 0)
@@ -343,50 +393,117 @@ mtext(side = 3, text = "Gaussian, comedies/dramas, non-zero records", line = 0.6
 ```
 ![SVM classification plot, gaussian, comedies/dramas, non-zero records](/graphs/plot-radial-cd-nzr.png)
 
-Nearly identical results. Note that further refinements could be made by adjusting the cost factor *C*, the gamma and other kernel parameters that are typically optimized by the automated training functions.
+There is a negligable difference in performance, as we saw in our results earlier. Note that further refinements could be made by adjusting the cost factor *C*, the gamma and other kernel parameters that are typically optimized by the automated training functions.
 
-Now, while this exercise has given us interesting insights from an academic perspective, it doesn't ultimately help us achieve our objective. Given that SVM works best with two classes, and that our data might be *too* sparse for meaningful results, we might conclude that our data might be better suited to another model.
-
-### Expanding our Analysis
-We can include additional models and algorithms, which RTextTools makes very easy to execute. The following code divides our 18,898 records into four blocks of 4,000 records, with the remaining records used for testing. Each block is trained and classified, and 5-fold cross-validation is performed to determine accuracy. The default parameters for each algorithm are used.
+However, now that we are only working with two classes, our model is a traditional binary classification problem and we can perform our classification to plot the area under the curve (AUC) using the *ROCR* R library, and visualize our results:
 ```r
-> for (idx in c(1:4000, 4001:8000, 8001:12000, 12001:16000)) {
+library(ROCR)
+data_for_svm$y = factor(data_for_svm$y) # Refactor class to remove unused classes
+data_for_svm_pred <- predict(data_for_svm_fit, data_for_svm, probability = T, decision.values = T) # Run classification
+table(data_for_svm_pred, data_for_svm$y) # Confusion Matrix
 
->   data_container <- create_container(data_matrix, as.numeric(factor(data_rnd$genre)), trainSize=idx, testSize = 16001:18898, virgin = FALSE) # Factorization of class is necessary or analysis will fail later
-  
->   data_models <- train_models(data_container, algorithms = c("SVM", "MAXENT", "SLDA", "BOOSTING"))
->   data_results <- classify_models(data_container, data_models)
->   data_analytics <- create_analytics(data_container, data_results)
-  
->   summary(data_analytics)
-  
->   cross_SVM <- cross_validate(data_container, 5, "SVM")
->   cross_MAXENT <- cross_validate(data_container, 5, "MAXENT")
->   cross_SLDA <- cross_validate(data_container, 5, "SLDA")
->   cross_BOOSTING <- cross_validate(data_container, 5, "BOOSTING")
+prob.comedy <- attr (data_for_svm_pred, "probabilities")[, "Comedy"] # Get Comedy probabilities
+roc.pred <- prediction(prob.comedy, data_for_svm$y == "Comedy") # Get Comedy predictions and labels
 
-> }
+data_for_svm_perf <- performance (roc.pred, "tpr", "fpr")
+plot(data_for_svm_perf, main="ROC for SVM Linear Model")
+abline(a = 0, b = 1, col="gray")
 ```
-If we collect the accuracy results from each cross-validation of each block of each model, we end up with the following graph:
+```text
+data_for_svm_pred Comedy Drama
+           Comedy    193   140
+           Drama     128   164
+```
 
-![Cross-Validation Graph](/graphs/rtexttools-auto.png)
+![ROC for SVM Linear Binary Model](/graphs/roc-svm-linear-binary.png)
 
-Interestingly, except for a single anomalous block in which *Maximum Entropy* performed admirably, only *Logitboost* (based on *AdaBoost*) produced consistent better-than-chance results.
+Our overall accuracy is now approximately 57%, however random chance is now 50% which makes our performance only marginally better, as can be seen on the ROC curve, with the gray line representing random chance.
+
+At any rate, while this exercise has given us interesting insights from an academic perspective, it doesn't ultimately help us achieve our multiclass classification objectives. So how can we improve our results?
+
+### Fitting The Data
+
+##### Class distribution
+Since we suspected that our results might be biased by our larger classes, let's build a new data set that attempts to better balance these. First, let's summarize the class distribution of our data:
+```r
+table(data_rnd$genre)
+```
+```text
+     Action   Adventure   Animation   Biography      Comedy       Crime Documentary       Drama      Family     Fantasy   Film-Noir 
+        802         514         392         221        3400         809         840        3804         594         250         125 
+  Game-Show     History      Horror       Music     Musical     Mystery        News     Romance      Sci-Fi       Short       Sport 
+          1         150        1239         247         286         393          14        1244         522         813         163 
+   Thriller         War     Western 
+       1329         209         537
+```
+
+##### Balancing
+As *most* classes seem to have around 250 records or more, we can use that as our safe "bucket" size.
+```r
+# Create balanced data set with max. 250 records per class, and no bum classes
+data_balanced <- NULL
+for (g in 1:length(levels(data_rnd$genre))) {
+  data_balanced <- rbind(data_balanced, head(subset(data_rnd, genre == levels(data_rnd$genre)[g]), 250))
+}
+data_balanced <- subset(data_balanced, !grepl("Game-Show|News", genre)) # Remove empty or near-empty classes
+data_balanced$genre <- factor(data_balanced$genre) # Re-factorize
+data_balanced <- data_balanced[sample(nrow(data_balanced)),] # Rando
+```
+Now let's see what our class distribution looks like:
+```r
+# Histogram of class distribution
+par(xaxt="n") # Turn off horizontal axis labels
+plot(data_balanced$genre, type="h", main = "Distribution of genres in balanced set") # Draw plot
+par(xaxt="s") # Turn back on horizontal axis labels
+
+incr <- par("usr")[2]/(length(levels(data_balanced$genre))+1) # Calculate distance between bars
+axis(1, at=seq(0, par("usr")[2]-incr, by=incr), labels = FALSE) # Draw horizontal ticks
+text(x = seq(0+incr, par("usr")[2]-incr, by=incr), y = -20, labels = sort(levels(data_balanced$genre)), srt = 90, pos = 2, xpd = TRUE, cex = 0.8) # Write horizontal labels
+```
+![Distribution of genres in balanced set](/graphs/hist-genres-balanced.png)
+
+##### Modelling
+Now that we have a much more even distribution among classes, let's see what sort of results we can get:
+```r
+data_balanced_matrix_tfidf <- create_matrix(data_balanced$plot, language = "english", stemWords = TRUE, removeStopwords = TRUE, removeNumbers = TRUE, removePunctuation = TRUE, removeSparseTerms = 0.998, weighting = weightTfIdf) # Create matrix
+data_balanced_container_tfidf <- create_container(data_balanced_matrix_tfidf, as.numeric(factor(data_balanced$genre)), trainSize=1:4000, testSize = 4001:5365, virgin = FALSE) # Factorization of class is necessary or analysis will fail later
+
+train_SVM_linear <- train_model(data_balanced_container_tfidf, "SVM", kernel = "linear")
+class_SVM_linear <- classify_model(data_balanced_container_tfidf, train_SVM_linear)
+anals_SVM_linear <- create_analytics(data_balanced_container_tfidf, class_SVM_linear)
+
+summary(anals_SVM_linear)
+table(unfactor(anals_SVM_linear@document_summary$SVM_LABEL), anals_SVM_linear@document_summary$MANUAL_CODE) # Confusion Matrix
+table(anals_SVM_linear@document_summary$SVM_LABEL == anals_SVM_linear@document_summary$MANUAL_CODE) # Accuracy
+```
+```text
+SVM_PRECISION    SVM_RECALL    SVM_FSCORE 
+    0.2604348     0.2630435     0.2591304 
+	
+FALSE  TRUE 
+ 1002   363
+```
+With our balanced data set, we achieved a precision and recall of approximately 26%, an improvement over our unbalanced classes, but an overall accuracy of just under 27%, which is worse. We can speculate that the predominance of classes 5 and 8 in our regular data set was actually helping our model by increasing the probability that any given document would fall into one of these two classes, making prediction "easier". With 23 even classes, any random guess has a lower probability of being true.
+
+![Heatmap for Balanced SVM Linear Model](/graphs/heatmap-svm-linear-balanced.png)
+
+These are interesting results, but still not particularly useful. Given that SVM works best with two classes, and that our data might be *too* sparse for meaningful results, it may simply be that our data might be better suited to another model. So let's find out!
 
 ### LogitBoost
+Another popular algorithm is LogitBoost, which claims to be less sensitive to outlier data than the algorithm on which it is based, AdaBoost, which takes an iterative voting-based methodology to classification. Let's look at its performance in more detail.
 
-Since we seemed to have some success with LogitBoost, let's look at its performance in more detail.
+##### Manual Modelling
 ```r
-> library("caTools")
-> library("caret")
+library("caTools")
+library("caret")
 
-> boost_model <- LogitBoost(head(as.matrix(data_matrix_tfidf), 4000), head(as.numeric(factor(data_rnd$genre)), 4000), nIter=10)
+boost_model <- LogitBoost(head(as.matrix(data_matrix_tfidf), 4000), head(as.numeric(factor(data_rnd$genre)), 4000), nIter=10)
 ```
 Here we instruct R to create our LogitBoost model on the first 4000 records of our weighed data. Typically, the higher the number of iterations, *nIter*, the more accurate the model will be. Next, we can run the prediction and see how our confidence levels:
 ```r
-> boost_scores <- predict(boost_model, tail(as.matrix(data_matrix_tfidf), 1000), nIter=10)
-> boost_scores_prob <- predict(boost_model, tail(as.matrix(data_matrix_tfidf), 1000), nIter=10, type = "raw")
-> t(cbind(boost_scores, round(boost_scores_prob, 4))[1:5,])
+boost_scores <- predict(boost_model, tail(as.matrix(data_matrix_tfidf), 1000))
+boost_scores_prob <- predict(boost_model, tail(as.matrix(data_matrix_tfidf), 1000), type = "raw")
+t(cbind(boost_scores, round(boost_scores_prob, 4))[1:5,])
 ```
 ```text
                [,1]   [,2]   [,3]    [,4]   [,5]
@@ -414,11 +531,12 @@ boost_scores     NA     NA     NA 17.0000     NA
 ```
 Note that I've transposed the results of this table using the *t* function for legibility, so that the documents are now the columns and the classes are now the rows. With that in mind, what this table allows us to see is the confidence, according to LogitBoost, of the first five documents falling into each of our 24 classes.
 
-Differing levels of confidence can be found. For example, LogitBoost has 50% confidence of document 4 belonging to class 17, the highest result for that document. On the other hand, there's 50% confidence that document 3 belongs to either 10 or 17. The remaining documents have relatively poor confidence across the board.
+Differing levels of confidence can be observed. For example, LogitBoost has 50% confidence of document 4 belonging to class 17, the highest result for that document. On the other hand, there's 50% confidence that document 3 belongs to either 10 or 17. The remaining documents have relatively poor confidence across the board.
 
+##### Results
 We can gauge the overall accuracy of our model by visualizing a confusion matrix:
 ```r
-> table(boost_scores, tail(as.numeric(factor(data_rnd$genre)), 1000))
+table(boost_scores, tail(as.numeric(factor(data_rnd$genre)), 1000))
 ```
 ```text
 boost_scores  1  2  3  4  5  6  7  8  9 10 11 13 14 15 16 17 18 19 20 21 22 23 24 25
@@ -441,7 +559,17 @@ boost_scores  1  2  3  4  5  6  7  8  9 10 11 13 14 15 16 17 18 19 20 21 22 23 2
           24  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
           25  0  0  1  0  0  0  0  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  7
 ```
-Here we can see a number of true positives, particularly for classes 5, 7, 8, 14, 19 and 25, as well as a high number of incorrect classifications spread across every class. Ultimately, only 99 of 299 classified documents were correct. Let's increase the iterations to 20 and try again:
+Here we can see a number of true positives, particularly for classes 5, 7, 8, 14, 19 and 25, as well as a high number of incorrect classifications spread across every class. 99 of 299 classified documents were correct, which is a 33% accuracy rate, seemingly in line with SVM's performance. That said, we tested on 1,000 records, so why do we only have 299 results?
+
+>Logitboost algorithm relies on a voting scheme to make classifications. Many (nIter of them)
+week classifiers are applied to each sample and their findings are used as votes to make the final
+classification. The class with the most votes "wins". However, with this scheme it is common for
+two cases have a tie (the same number of votes), especially if number of iterations is even. In that
+case NA is returned, instead of a label.
+
+Well now, earlier we'll recall observing a document that was had an equal probabability of falling into one of two classes. In these cases, LogitBoost will simply deem the result inconclusive. For our data, 701 documents were discarded as such, which is certainly not ideal!
+
+However, increased iterations is likely to reduce the likelihood of a tie, so let's increase the iterations to 20 and try again:
 ```text
 boost_scores  1  2  3  4  5  6  7  8  9 10 11 13 14 15 16 17 18 19 20 21 22 23 24 25
           1   3  0  0  0  0  1  0  0  0  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0
@@ -467,18 +595,18 @@ boost_scores  1  2  3  4  5  6  7  8  9 10 11 13 14 15 16 17 18 19 20 21 22 23 2
           24  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0
           25  0  0  1  0  1  0  0  3  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 10
 ```
-Here we see better representation among the classes, with more documents being classified, but our overall result of 97 of 342 true positives is still lacking. Additional work would therefore be needed to increase the accuracy of this model before we could it reliably. At this stage, we could also plot the area under the curve using R's *ROCR* library, but as it is limited to binary classification, we will skip this step.
+Here we see better representation among the classes, with slightly more documents being classified, but our overall result of 97 of 342 documents, or 28%, is actually a regression in our accuracy. Is it likely that more iterations would lead to more classifications but lower accuracy? More testing would be required to confirm that hypothesis.
 
-Let's look back on our automated RTextTools model, since it produced favourable results:
+##### Assisted Modelling
+Perhaps RTextTools does a better job of optimizing algorithms. Let's examine its results more closely:
 ```r
-> data_container_tfidf <- create_container(data_matrix_tfidf, as.numeric(factor(data_rnd$genre)), trainSize = 1:4000, testSize = 16001:18898, virgin = FALSE) # Factorization of class is necessary or analysis will fail later
-> data_model <- train_model(data_container_tfidf, algorithm = "BOOSTING")
-> data_results <- classify_model(data_container_tfidf, data_model)
-> data_analytics <- create_analytics(data_container_tfidf, data_results)
+data_model <- train_model(data_container_tfidf, algorithm = "BOOSTING")
+data_results <- classify_model(data_container_tfidf, data_model)
+data_analytics <- create_analytics(data_container_tfidf, data_results)
 ```
 In examining *data_model*, we can actually see that RTextTools has opted for 100 iterations. So let's map the confusion matrix again:
 ```r
-> table(data_results$LOGITBOOST_LABEL, tail(as.numeric(factor(data_rnd$genre)), 2898))
+table(data_results$LOGITBOOST_LABEL, tail(as.numeric(factor(data_rnd$genre)), 2898))
 ```
 ```text
        1   2   3   4   5   6   7   8   9  10  11  13  14  15  16  17  18  19  20  21  22  23  24  25
@@ -506,20 +634,157 @@ In examining *data_model*, we can actually see that RTextTools has opted for 100
   8   18  16   2  11  78  18  15 140   8   5   6   5  18   4   5   6   0  37  11  10   4  30   7  17
   9    2   1   4   0   7   2   1   5   2   0   0   0   6   1   0   0   0   1   1   6   0   1   0   0
 ```
-Ultimately, our automated model produced 620 true positives out of 2898.
+With 100 iterations, all 2,898 of our testing documents were successfully classified, with 620 true positives for an overall accuracy of approximately 21%. Not bad, but worse than SVM.
+
+##### Biasing
+Does LogitBoost perform any better with balanced classes? Let's model and see:
+```r
+data_balanced_model <- train_model(data_balanced_container_tfidf, algorithm = "BOOSTING")
+data_balanced_results <- classify_model(data_balanced_container_tfidf, data_balanced_model)
+data_balanced_analytics <- create_analytics(data_balanced_container_tfidf, data_balanced_results)
+
+summary(data_balanced_analytics)
+table(data_balanced_analytics@document_summary$LOGITBOOST_LABEL == data_balanced_analytics@document_summary$MANUAL_CODE) # Accuracy
+```
+```text
+LOGITBOOST_PRECISION    LOGITBOOST_RECALL    LOGITBOOST_FSCORE 
+           0.2052174            0.1721739            0.1773913 
+		   
+FALSE  TRUE 
+ 1132   233 
+```
+Well, no. Our results are worse still, with an accuracy of approximately 17%. As with before, having equal classes actually reduces the chance of a correct guess.
+
+### Expanding our Analysis
+So far, we've tried two algorithms with various settings, on differently sized and balanced data sets. Our results can be summarized as follows:
+
+Model|Settings|Training|Testing|Class Sizes|Classes|Coverage|Precision|Recall|F-Score|Accuracy
+---|---|---|---|---|---|---|---|---|---|---
+SVM|Linear|4,000|2,898|0 - 777|25|100%|0.214|0.155|0.162|0.309
+SVM|Gaussian|4,000|2,898|0 - 777|25|100%|0.214|0.155|0.162|0.323
+SVM|Linear|4,000|1,365|125 - 250|23|100%|0.260|0.263|0.259|0.266
+SVM|Gaussian|4,000|1,365|125 - 250|23|100%|0.199|0.207|0.144|0.185
+LogitBoost|10 i.|4,000|1,000|0 - 777|25|30%|-|-|-|0.331
+LogitBoost|20 i.|4,000|1,000|0 - 777|25|34%|-|-|-|0.284
+LogitBoost|100 i.|4,000|1,000|0 - 777|25|100%|-|-|-|0.214
+LogitBoost|100 i.|4,000|1,365|125 - 250|23|100%|0.205|0.172|0.177|0.171
+
+Overall, Gaussian SVM with large training sets is the current frontrunner. However, we can include additional models and algorithms, which RTextTools makes very easy to execute. The following code divides our 18,898 records into four blocks of 4,000 documents, with the remaining documents used for testing. Each block of documents is trained and classified sequentially, and the default parameters for each algorithm are used.
+```r
+for (idx in c(1:4000, 4001:8000, 8001:12000, 12001:16000)) {
+
+  data_container_tfidf <- create_container(data_matrix_tfidf, as.numeric(factor(data_rnd$genre)), trainSize=idx, testSize = 16001:18898, virgin = FALSE) # Factorization of class is necessary or analysis will fail later
+  
+  data_models <- train_models(data_container_tfidf, algorithms = c("SVM", "MAXENT", "SLDA", "BOOSTING"))
+  data_results <- classify_models(data_container_tfidf, data_models)
+  data_analytics <- create_analytics(data_container_tfidf, data_results)
+  
+  summary(data_analytics)
+}
+```
+If we collect the accuracy results from each block of documents for each algorithm, we end up with the following results:
+
+Algorithm\Docs|1 - 4000|4001 - 8000|8001 - 12000|12001 - 16000
+---|---|---|---|---
+SVM|0.312|0.315|0.321|0.312
+SLDA|0.277|0.288|0.295|0.286
+MAXENT|0.242|0.269|0.267|0.259
+LOGITBOOST|0.209|0.222|0.225|0.227
+
+These results are pretty consistent with our own findings, with SVM still in the lead. We can also visualize this data:
+```r
+par(xaxt="n") # Turn off horizontal axis labels
+plot(type = "o", x = c(1:4), y = subset(auto_results, V2 == unique(auto_results$V2)[1])$V3, ylim=c(0.2, 0.45), col=c("red", "blue", "green", "orange")[1], ylab = "Accuracy", xlab="Sequential Documents", main = "Sequential Classification Accuracy", pch = 19)
+for (i in 2:length(unique(auto_results$V2))) {
+  points(type = "o", x = c(1:4), y = subset(auto_results, V2 == unique(auto_results$V2)[i])$V3, col=c("red", "blue", "green", "orange")[i], pch = 19)
+}
+par(xaxt="s") 
+axis(1, 1:4, unique(auto_results$V1)) # Draw horizontal ticks and labels
+legend("topright", legend = unique(auto_results$V2), col=c("red", "blue", "green", "orange"), text.col=c("red", "blue", "green", "orange"), cex=0.8, pch=19)
+```
+
+![Sequential Classification Accuracy](/graphs/plot-accuracy-sequential.png)
+
+We can observe that different document blocks produce marginally different results. However, it's generally considered to be best practice to train on cumulative documents, so let's see what happens if we do that. Please note that this is a very computationally expensive task, so make sure your computer is up to par before attempting it.
+Algorithm\Docs|1 - 4000|1 - 8000|1 - 12000|1 - 16000
+---|---|---|---|---
+SVM|0.326|0.343|0.361|0.367
+SLDA|0.295|0.321|0.337|0.349
+MAXENT|0.268|0.259|0.272|0.255
+LOGITBOOST|0.214|0.217|0.233|0.233
+
+We can observe a nominal but proportional increase in accuracy with respect to the number of training documents for most algorithms.
+
+![Cumulative Classification Accuracy](/graphs/plot-accuracy-cumulative.png)
+
+And our heatmaps trained with 16,000 documents:
+
+![Heatmap, SVM, 16000 documents](/graphs/heatmap-final-svm.png)
+![Heatmap, SLDA, 16000 documents](/graphs/heatmap-final-slda.png)
+![Heatmap, MAXENT, 16000 documents](/graphs/heatmap-final-maxent.png)
+![Heatmap, LOGITBOOST, 16000 documents](/graphs/heatmap-final-logit.png)
+
+##### Results
+If we continue testing the remainder of our algorithms, we can achieve results similar to this:
+Algorithm|Training Docs|Precision|Recall|F-Score|Accuracy
+---|---|---|---|---|---
+Bootstrap Aggregation|4000|0.11583333|0.07250000|0.06208333|0.2456866
+Bootstrap Aggregation|16000|0.16208333|0.09208333|0.08750000|0.2684610
+Generalized Linear Models|4000|0.20166667|0.09791667|0.09875000|0.2791580
+LogitBoost|4000|0.1595833|0.1325000|0.1345833|0.2139406
+LogitBoost|8000|0.1700000|0.1470833|0.1450000|0.2170462
+LogitBoost|12000|0.2191667|0.1579167|0.1612500|0.2325741
+LogitBoost|16000|0.2012500|0.1529167|0.1508333|0.2329192
+Maximum Entropy|4000|0.1929167|0.1633333|0.1725000|0.2681159
+Maximum Entropy|8000|0.1825000|0.1687500|0.1716667|0.2587991
+Maximum Entropy|12000|0.1991667|0.1845833|0.1887500|0.2715665
+Maximum Entropy|16000|0.1954167|0.1729167|0.1795833|0.2546583
+Neural Network|4000|0.00875000|0.04166667|0.01458333|0.2056590
+Neural Network|16000|0.02458333|0.06250000|0.03208333|0.2142857
+Random Forest|4000|0.15500000|0.10416667|0.09541667|0.3015873
+Random Forest|16000|0.2825000|0.1283333|0.1237500|0.3178053
+Supervised Latent Dirichlet Allocation|4000|0.2262500|0.1737500|0.1887500|0.2950310
+Supervised Latent Dirichlet Allocation|8000|0.2483333|0.2212500|0.2287500|0.3209109
+Supervised Latent Dirichlet Allocation|12000|0.2566667|0.2462500|0.2458333|0.3374741
+Supervised Latent Dirichlet Allocation|16000|0.2658333|0.2566667|0.2558333|0.3488612
+Support Vector Machine|4000|0.2179167|0.1495833|0.1504167|0.3264320
+Support Vector Machine|8000|0.2254167|0.1770833|0.1775000|0.3429951
+Support Vector Machine|12000|0.2583333|0.2008333|0.2033333|0.3605935
+Support Vector Machine|16000|0.2695833|0.2179167|0.2220833|0.3671497
+Tree|4000|0.03958333|0.05750000|0.03708333|0.2091097
+Tree|16000|0.03125000|0.05291667|0.03000000|0.2177363
+
+For which the accuracy can be better visualized as follows:
+
+[!Overall Accuracy per Algorithm](/graphs/algo-performance.png)
+
+##### k-Fold Cross-Validation
+Cross validation is another technique for assessing how our models will perform on independent data-sets. Unlike our previous examples, in which we trained and tested on separate data, cross-validation divides the data set into *k* folds, testing on 1 fold and training on the remaining k - 1 folds, incrementally changing the test fold until all folds have been covered.
+
+Testing a number of our algorithms using 5-fold cross-validation, we achieve the following results:
+
+[!5-fold Cross-Validation Results](/graphs/cf-results.png)
+
+While the last four algorithms all perform roughly equivalently to their random data testing performance, the first four showed noticeable differences. LogitBoost, GLMNet and MaxEnt may all be good examples of *over-fitting*. That is, because the models are too strongly fit around the training data, they test extremely well on this same data, but poorly on any new data that was previously unseen. Tree, on the other hand, may be a case of mild underfitting, essentially the opposite problem.
 
 ### Conclusion
 
-With reduced sparsity and enough iterations, it should be possible to produce a model with a reasonable level of accuracy. This model can then be applied to predict the class of untrained data. That is, we can submit new plots and determine what genre our model thinks they would fall into. However, further experimentation is needed.
+Multiclass classification is a challenging process, all the more so when combined with text mining. Our experiments have shown that Support Vector Machine demonstrated overall the best performance, particularly with larger training sets.
+
+With enough training records, it may be possible to increase the overall accuracy to a level which would be useful for practical predictions. However, the law of diminishing returns is likely to apply once a certain threshold is reached. In some cases, we also observed certain algorithms, such as Maximum Entropy, beginning to perform worse with extremely large training sets, suggesting that plateauing is a likely outcome.
+
+Ultimately, with our data in its current state, automatic classification of genre based on plot may not achievable. That said, re-examing and restructuring the data would be a better approach towards achieving better accuracy. With adjusted sparsity, as well as the possible inclusion of additional features unrelated to plot, it may be possible to build a high-performing model. Further experimentation is needed.
 
 ### Further Research
 
 The following tasks may be worth pursuing to further improve results:
 
+* Adjust algorithm parameters to prevent overfitting.
 * Manipulate sparsity levels and determine affect on weighted matrices.
 * Attempt different block sizes and determine affect on results.
-* Test remaining models supported by RTextTools: Elastic net Regularization *(GLMNet)*, Bootstrap Aggregation *(Bagging)*, Random Forest *(RF)*, Neural Network *(NNET)*, and Trees *(TREE)*.
-* Figure out to draw ROC curve for non-binary classification.
+* Score and include movie title to modelling to determine impact on weighing.
+* Include additional non-semantic features, including movie length, year, and so forth to determine their relevance.
+* Test Generalized Linear Models *(GLMNet)* with 16,000 records, which failed during my tests.
 * Investigate e1071's [tune](http://www.inside-r.org/packages/cran/e1071/docs/tune) function.
 
 ### Reference R Library Manuals
@@ -529,3 +794,5 @@ The following tasks may be worth pursuing to further improve results:
 * [caTools manual](https://cran.r-project.org/web/packages/caTools/caTools.pdf)
 * [caret manual](https://cran.r-project.org/web/packages/caret/caret.pdf)
 * [SparseM manual](https://cran.r-project.org/web/packages/SparseM/SparseM.pdf)
+* [ROCR manual](https://cran.r-project.org/web/packages/ROCR/ROCR.pdf)
+* [AUC manual](https://cran.r-project.org/web/packages/AUC/AUC.pdf)
