@@ -126,7 +126,7 @@ library("RTextTools")
 
 data_matrix_tf <- create_matrix(data_rnd$plot, language = "english", stemWords = TRUE, removeStopwords = TRUE, removeNumbers = TRUE, removePunctuation = TRUE, removeSparseTerms = 0.998, weighting = weightTf) # Create matrix
 ```
-This creates a matrix, *data_matrix_tf*, which contains 18,898 rows, our movie list, and 3,262 columns, a list of weighted, stemmed words of interest which have become our features. Note that a sparsity of 0.998 in order to reduce overhead. You can reduce this number to improve results at the expense of greater memory usage.
+This creates a matrix, *data_matrix_tf*, which contains 18,898 rows, our movie list, and 3,262 columns, a list of weighted, stemmed words of interest which have become our features. Note that a sparsity of 0.998 was specified in order to reduce overhead. You can reduce this number to improve results at the expense of greater memory usage.
 
 If we peek into our matrix, we can get a sense of what's been done:
 ```text
@@ -162,7 +162,7 @@ Docs          navi      navig       nazi       near     nearbi  necessari       
   2     0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.24135401 0.00000000 0.00000000
   3     0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000
 ```
-"dollar" still appears in documents 1 and 3, but has been giving slightly less weight in document 1 than in document 3, likely because of the frequency in which it appears in any number of the remaining 18,895 documents not shown here. Similarly, "need" has been giving a score in document 2 which better takes into account its frequency elsewhere.
+"dollar" still appears in documents 1 and 3, but has been given slightly less weight in document 1 than in document 3, likely because of the frequency in which it appears in any number of the remaining 18,895 documents not shown here. Similarly, "need" has been giving a score in document 2 which better takes into account its frequency elsewhere.
 
 It's important to note that both these functions create a *sparse* matrix. That is, if we have, as we've said, 18,898 documents with 3,262 features, we would normally require a matrix of 18,898 x 3,262 = 61,645,276 cells to store every possible value. However, since most of those values will be zero, we can use a sparse matrix to store only non-zero values and infer the rest, reducing the number of required cells in this case to 668,825 and lowering memory consumption considerably. This can be verified by viewing the matrix:
 ```r
@@ -341,7 +341,7 @@ FALSE  TRUE
 FALSE  TRUE 
  1963   935 
 ```
-Ultimately, our linear accuracy is 895 / 2898 = 0.3088337, or roughly 31%, compared to 32% for the Gaussian. At first glance, these numbers might seem low, but they must be contrasted against results from random chance, which would be approximately 1 in 25, or 4%, given equal probabilities for all classes. We can visualize these results using a confusion matrix heatmap, using our linear kernel as an example, but because of some trickery with how R factorizes its labels, we must apply an unfactor function:
+Ultimately, our linear accuracy is 895 / 2898 = 0.3088337, or roughly 31%, compared to 32% for the Gaussian. At first glance, these numbers might seem low, but they must be contrasted against results from random chance, which would be approximately 1 in 24, or approximately 4.2%, given equal probabilities for all classes. We can visualize these results using a confusion matrix heatmap, using our linear kernel as an example, but because of some trickery with how R factorizes its labels, we must apply an unfactor function:
 ```r
 unfactor <- function(obj) {
   unfactor <- as.numeric(levels(obj)[as.integer(obj)])
@@ -522,7 +522,11 @@ boost_scores     NA     NA     NA 17.0000     NA
 13           0.0003 0.0025 0.0003  0.0025 0.0025
 14           0.0180 0.1192 0.0180  0.1192 0.0180
 15           0.0180 0.0025 0.0003  0.0025 0.0003
-16           0.0180 0.0180 0.0180  0.0025 0.0025
+16           0.0025 0.0180 0.0180  0.0025 0.0025
+17           0.0180 0.0180 0.5000  0.5000 0.0180
+18           0.0000 0.0003 0.0003  0.0003 0.0003
+19           0.1192 0.1192 0.1192  0.1192 0.1192
+20           0.0180 0.0180 0.0180  0.0025 0.0025
 21           0.0180 0.0180 0.0180  0.0180 0.0180
 22           0.0025 0.0025 0.0025  0.0025 0.0025
 23           0.1192 0.1192 0.1192  0.1192 0.1192
@@ -531,7 +535,7 @@ boost_scores     NA     NA     NA 17.0000     NA
 ```
 Note that I've transposed the results of this table using the *t* function for legibility, so that the documents are now the columns and the classes are now the rows. With that in mind, what this table allows us to see is the confidence, according to LogitBoost, of the first five documents falling into each of our 24 classes.
 
-Differing levels of confidence can be observed. For example, LogitBoost has 50% confidence of document 4 belonging to class 17, the highest result for that document. On the other hand, there's 50% confidence that document 3 belongs to either 10 or 17. The remaining documents have relatively poor confidence across the board.
+Differing levels of confidence can be observed. For example, LogitBoost has 50% confidence of document 4 belonging to class 17, the highest result for that document, and has therefore classified it as such, as seen by the 17 at the top of the column. On the other hand, there's 50% confidence that document 3 belongs to either 10 or 17, and no decision was made. The remaining documents have relatively poor confidence across the board, with no decisions either.
 
 ##### Results
 We can gauge the overall accuracy of our model by visualizing a confusion matrix:
@@ -567,7 +571,7 @@ classification. The class with the most votes "wins". However, with this scheme 
 two cases have a tie (the same number of votes), especially if number of iterations is even. In that
 case NA is returned, instead of a label.
 
-Well now, earlier we'll recall observing a document that was had an equal probabability of falling into one of two classes. In these cases, LogitBoost will simply deem the result inconclusive. For our data, 701 documents were discarded as such, which is certainly not ideal!
+Well now, earlier we'll recall observing a document that was had an equal probabability of falling into one of two classes, and no decision was made. In these cases, LogitBoost will simply deem the result inconclusive. For our data, 701 documents were discarded as such, which is certainly not ideal!
 
 However, increased iterations is likely to reduce the likelihood of a tie, so let's increase the iterations to 20 and try again:
 ```text
@@ -606,11 +610,19 @@ data_analytics <- create_analytics(data_container_tfidf, data_results)
 ```
 In examining *data_model*, we can actually see that RTextTools has opted for 100 iterations. So let's map the confusion matrix again:
 ```r
-table(data_results$LOGITBOOST_LABEL, tail(as.numeric(factor(data_rnd$genre)), 2898))
+table(unfactor(data_results$LOGITBOOST_LABEL), tail(as.numeric(factor(data_rnd$genre)), 2898))
 ```
 ```text
        1   2   3   4   5   6   7   8   9  10  11  13  14  15  16  17  18  19  20  21  22  23  24  25
   1   13   3   3   0  24  10   6  29   8   5   0   1   6   3   5   5   0   8   4   3   1  22   5   5
+  2   21  20   7   3  26   9  11  33   6   2   0   2   8   2   6   3   0   9   8   9   0  17   3   7
+  3    2   2   9   0  20   4   3  10  12   2   0   1   3   0   3   1   0   2   1  16   0   3   0   0
+  4    0   1   0   1   1   0   1   7   1   0   0   0   0   0   0   0   0   1   0   0   1   0   0   0
+  5   32  10  15   9 228  24  24 197  35  11   5   5  41  14  15   8   0  78  17  42   9  44   1  18
+  6   13   7   3   2  30  23   2  54   1   0   2   2  11   3   0   7   0   9   2   3   0  27   0  13
+  7    2   1   0   8  10   3  58  25   1   1   0   6  11   7   0   1   4   3   2   5   0   6   4   0
+  8   18  16   2  11  78  18  15 140   8   5   6   5  18   4   5   6   0  37  11  10   4  30   7  17
+  9    2   1   4   0   7   2   1   5   2   0   0   0   6   1   0   0   0   1   1   6   0   1   0   0
   10   3   3   0   0   4   0   0   5   0   1   0   0   3   0   0   0   0   3   0   1   0   4   0   1
   11   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   1   0   0   0   0   0   0
   13   0   0   0   1   0   0   0   0   0   0   0   0   0   0   0   0   0   0   1   0   0   0   0   0
@@ -619,20 +631,12 @@ table(data_results$LOGITBOOST_LABEL, tail(as.numeric(factor(data_rnd$genre)), 28
   16   2   1   1   0   8   0   1   6   4   0   0   0   2   1   3   1   0   3   0   3   0   1   0   2
   17   1   0   3   0   1   3   1   8   1   1   0   0   9   0   1   3   0   3   2   0   0   8   0   1
   19   3   6   0   0  10   4   1  23   0   2   0   3   0   1   4   2   0  18   2   3   0   2   0   0
-  2   21  20   7   3  26   9  11  33   6   2   0   2   8   2   6   3   0   9   8   9   0  17   3   7
   20   3   2   1   0   4   0   2   3   2   1   0   0   4   0   0   0   0   0  12   2   0   3   0   0
   21   1   0   6   0  12   0   6   4   5   0   1   1   2   2   2   0   0   3   3  10   1   1   1   1
   22   0   0   1   1   2   0   1   1   1   0   0   0   2   0   0   0   0   0   0   0   4   0   0   0
   23  10   3   2   1  13   9   4  22   3   2   1   1  19   0   0   5   0   0   7   6   0  18   4   4
   24   3   1   0   0   1   0   0   2   0   0   0   0   0   0   0   0   0   0   0   0   0   1   2   0
   25   2   1   1   0   3   0   0   6   2   0   0   0   1   0   0   0   0   1   1   1   0   1   1  18
-  3    2   2   9   0  20   4   3  10  12   2   0   1   3   0   3   1   0   2   1  16   0   3   0   0
-  4    0   1   0   1   1   0   1   7   1   0   0   0   0   0   0   0   0   1   0   0   1   0   0   0
-  5   32  10  15   9 228  24  24 197  35  11   5   5  41  14  15   8   0  78  17  42   9  44   1  18
-  6   13   7   3   2  30  23   2  54   1   0   2   2  11   3   0   7   0   9   2   3   0  27   0  13
-  7    2   1   0   8  10   3  58  25   1   1   0   6  11   7   0   1   4   3   2   5   0   6   4   0
-  8   18  16   2  11  78  18  15 140   8   5   6   5  18   4   5   6   0  37  11  10   4  30   7  17
-  9    2   1   4   0   7   2   1   5   2   0   0   0   6   1   0   0   0   1   1   6   0   1   0   0
 ```
 With 100 iterations, all 2,898 of our testing documents were successfully classified, with 620 true positives for an overall accuracy of approximately 21%. Not bad, but worse than SVM.
 
@@ -761,7 +765,7 @@ For which the accuracy can be better visualized as follows:
 ![Overall Accuracy per Algorithm](/graphs/algo-performance.png)
 
 ##### k-Fold Cross-Validation
-Cross validation is another technique for assessing how our models will perform on independent data-sets. Unlike our previous examples, in which we trained and tested on separate data, cross-validation divides the data set into *k* folds, testing on 1 fold and training on the remaining k - 1 folds, incrementally changing the test fold until all folds have been covered.
+Cross validation is another technique for assessing how our models will perform on independent data sets. Unlike our previous examples, in which we trained and tested on separate data, cross-validation divides the data set into *k* folds, testing on 1 fold and training on the remaining k - 1 folds, incrementally changing the test fold until all folds have been covered.
 
 Testing a number of our algorithms using 5-fold cross-validation, we achieve the following results:
 
