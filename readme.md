@@ -119,7 +119,7 @@ Morphing typically entails:
 
 Scoring is typically done by weighing the words using either TF, term frequency, or TF-IDF, term frequency-inverse document frequency. The former simply counts the frequency of terms within a document; the latter, however, increases a term's score the more frequently it appears within the document, while reducing the score the more frequently it appears in *other* documents, thereby giving you a more accurate representation of a term's importance in relation to the entire corpus.
 
-In R, we can facilitate these tasks using any number of libraries. I have selected to use the **tm** and [**RTextTools**](http://www.rtexttools.com/documentation.html) libraries. Using our previously randomized data, we can create a weighing matrix like so:
+In R, we can facilitate these tasks using any number of libraries. I have selected to use the *tm* and [*RTextTools*](http://www.rtexttools.com/documentation.html) libraries. Using our previously randomized data, we can create a weighing matrix like so:
 ```r
 library("tm")
 library("RTextTools")
@@ -314,7 +314,7 @@ text(x = seq(par("xaxp")[1]+incr, par("xaxp")[2], by=incr), y = -20, labels = so
 ```
 ![Distribution of genres in first block](/graphs/hist-genres.png)
 
-As suspected, the 5th and 8th classes, Comedy and Drama, have much higher occurrences than any of the other classes. However, does that imnply a biasing of our classification? It's possible given that, as we said earlier, in our one-versus-one approach, these two classes are most likely to be selected by the most classifiers. 
+As suspected, the 5th and 8th classes, Comedy and Drama, have much higher occurrences than any of the other classes. However, does that imply a biasing of our classification? It's possible given that, as we said earlier, in our one-versus-one approach, these two classes are most likely to be selected by the most classifiers. 
 
 ##### Results
 So, overall, how well did we do?
@@ -341,7 +341,7 @@ FALSE  TRUE
 FALSE  TRUE 
  1963   935 
 ```
-Ultimately, our linear accuracy is 895 / 2898 = 0.018, or roughly 31%, compared to 32% for the Gaussian. At first glance, these numbers might seem low, but they must be contrasted against results from random chance, which would be approximately 1 in 25, or 4%, given equal probabilities for all classes. We can visualize these results using a confusion matrix heatmap, using our linear kernel as an example, but because of some trickery with how R factorizes its labels, we must apply an unfactor function:
+Ultimately, our linear accuracy is 895 / 2898 = 0.3088337, or roughly 31%, compared to 32% for the Gaussian. At first glance, these numbers might seem low, but they must be contrasted against results from random chance, which would be approximately 1 in 25, or 4%, given equal probabilities for all classes. We can visualize these results using a confusion matrix heatmap, using our linear kernel as an example, but because of some trickery with how R factorizes its labels, we must apply an unfactor function:
 ```r
 unfactor <- function(obj) {
   unfactor <- as.numeric(levels(obj)[as.integer(obj)])
@@ -483,7 +483,7 @@ SVM_PRECISION    SVM_RECALL    SVM_FSCORE
 FALSE  TRUE 
  1002   363
 ```
-With our balanced data set, we achieved a precision and recall of approximately 26%, an improvement over our unbalanced classes, but an overall accuracy of just under 27%, which is worse. We can speculate that the predominance of classes 5 and 8 in our regular data set was actually helping our model by increasing the probability that any given document would fall into one of these two classes, making prediction "easier". With 23 even classes, any random guess has a lower probability of being true.
+With our balanced data set, we achieved a precision and recall of approximately 26%, an improvement over our unbalanced classes, but an overall accuracy of just under 27%, which is worse. We can speculate that the predominance of classes 5 and 8 in our regular data set was actually helping our model by increasing the probability that any given document would fall into one of these two classes, making predictions "easier". With 23 even classes, any random guess has a lower probability of being true.
 
 ![Heatmap for Balanced SVM Linear Model](/graphs/heatmap-svm-linear-balanced.png)
 
@@ -706,6 +706,7 @@ legend("topright", legend = unique(auto_results$V2), col=c("red", "blue", "green
 ![Sequential Classification Accuracy](/graphs/plot-accuracy-sequential.png)
 
 We can observe that different document blocks produce marginally different results. However, it's generally considered to be best practice to train on cumulative documents, so let's see what happens if we do that. Please note that this is a very computationally expensive task, so make sure your computer is up to par before attempting it.
+
 Algorithm\Docs|1 - 4000|1 - 8000|1 - 12000|1 - 16000
 ---|---|---|---|---
 SVM|0.326|0.343|0.361|0.367
@@ -713,7 +714,7 @@ SLDA|0.295|0.321|0.337|0.349
 MAXENT|0.268|0.259|0.272|0.255
 LOGITBOOST|0.214|0.217|0.233|0.233
 
-We can observe a nominal but proportional increase in accuracy with respect to the number of training documents for most algorithms.
+We can observe a nominal but proportional increase in accuracy with respect to the number of training documents for most algorithms:
 
 ![Cumulative Classification Accuracy](/graphs/plot-accuracy-cumulative.png)
 
@@ -726,6 +727,7 @@ And our heatmaps trained with 16,000 documents:
 
 ##### Results
 If we continue testing the remainder of our algorithms, we can achieve results similar to this:
+
 Algorithm|Training Docs|Precision|Recall|F-Score|Accuracy
 ---|---|---|---|---|---
 Bootstrap Aggregation|4000|0.11583333|0.07250000|0.06208333|0.2456866
@@ -756,14 +758,14 @@ Tree|16000|0.03125000|0.05291667|0.03000000|0.2177363
 
 For which the accuracy can be better visualized as follows:
 
-[!Overall Accuracy per Algorithm](/graphs/algo-performance.png)
+![Overall Accuracy per Algorithm](/graphs/algo-performance.png)
 
 ##### k-Fold Cross-Validation
 Cross validation is another technique for assessing how our models will perform on independent data-sets. Unlike our previous examples, in which we trained and tested on separate data, cross-validation divides the data set into *k* folds, testing on 1 fold and training on the remaining k - 1 folds, incrementally changing the test fold until all folds have been covered.
 
 Testing a number of our algorithms using 5-fold cross-validation, we achieve the following results:
 
-[!5-fold Cross-Validation Results](/graphs/cf-results.png)
+![5-fold Cross-Validation Results](/graphs/cf-results.png)
 
 While the last four algorithms all perform roughly equivalently to their random data testing performance, the first four showed noticeable differences. LogitBoost, GLMNet and MaxEnt may all be good examples of *over-fitting*. That is, because the models are too strongly fit around the training data, they test extremely well on this same data, but poorly on any new data that was previously unseen. Tree, on the other hand, may be a case of mild underfitting, essentially the opposite problem.
 
