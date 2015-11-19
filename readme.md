@@ -22,7 +22,7 @@ The following papers may be of interest:
 
 ### Data Source
 
-To perform my analysis, I’ve used the September 11, 2015 release of the Internet Movie Database (IMDB), the latest version of which is available for download [here](ftp://ftp.fu-berlin.de/pub/misc/movies/database/). The data is in compressed plain text, column aligned or tab delineated and prefaced with one or more introductory sections, with each file containing one major movie attribute.
+To perform my analysis, I’ve used the September 11, 2015 release of the Internet Movie Database (IMDB), the latest version of which is available for download [here](http://www.imdb.com/interfaces). The data is in compressed plain text, column aligned or tab delineated and prefaced with one or more introductory sections, with each file containing one major movie attribute.
 
 ### Data Cleaning
 
@@ -162,7 +162,7 @@ Docs          navi      navig       nazi       near     nearbi  necessari       
   2     0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.24135401 0.00000000 0.00000000
   3     0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000 0.00000000
 ```
-"dollar" still appears in documents 1 and 3, but has been given slightly less weight in document 1 than in document 3, likely because of the frequency in which it appears in any number of the remaining 18,895 documents not shown here. Similarly, "need" has been giving a score in document 2 which better takes into account its frequency elsewhere.
+"dollar" still appears in documents 1 and 3, but has been given slightly less weight in document 1 than in document 3, likely because of the frequency in which it appears in any number of the remaining 18,895 documents not shown here. Similarly, "need" has been given a score in document 2 which better takes into account its frequency elsewhere.
 
 It's important to note that both these functions create a *sparse* matrix. That is, if we have, as we've said, 18,898 documents with 3,262 features, we would normally require a matrix of 18,898 x 3,262 = 61,645,276 cells to store every possible value. However, since most of those values will be zero, we can use a sparse matrix to store only non-zero values and infer the rest, reducing the number of required cells in this case to 668,825 and lowering memory consumption considerably. This can be verified by viewing the matrix:
 ```r
@@ -364,17 +364,19 @@ mtext(side = 3, text = "Linear, all genres, all records", line = 0.6)
 ```
 ![SVM classification plot, linear, all genres, all records](/graphs/plot-linear-allg-allr.png)
 
-We can see by the color shading that the results have been biased to the same two classes. As well, if we remember our sparse matrix graph from earlier, many entries exist that are zero for both terms, which could further bias our results. So what happens if we remove these entries?
+If we look at the background colors of this plot, only two distinct colors appear, which means all the points are being biased into one of the two classes represented by these colors. The legend makes it a bit unclear which these are, as only four of the 24 values are written out, but it's a safe assumption that it's our usual two culprits, Comedy and Drama.
+
+There are also some points in the extreme lower-left corner. These are points which are 0 for both terms in our plot. If we remember our sparse matrix graph from earlier, many zero entries exist, which could further bias our results by skewing the data towards them, particularly given their high frequency. So what happens if we remove these entries?
 ```r
 data_for_svm <- data.frame(X1 = as.matrix(data_container_tfidf@training_matrix)[, 1111], X2 = as.matrix(data_container_tfidf@training_matrix)[, 1231], y = as.factor(data_rnd$genre[1:4000]))
-data_for_svm <- subset(data_for_svm, X1 != 0 | X2 != 0)
+data_for_svm <- subset(data_for_svm, X1 != 0 | X2 != 0) # Only keep values which are non-zero for one or both terms
 data_for_svm_fit = svm(factor(y) ~ ., data = data_for_svm, scale = FALSE, kernel = "linear", cost = 10)
 plot(data_for_svm_fit, data_for_svm)
 mtext(side = 3, text = "Linear, all genres, non-zero records", line = 0.6)
 ```
 ![SVM classification plot, linear, all genres, non-zero records](/graphs/plot-linear-allg-nzr.png)
 
-Our classification looks a little better here, but is still biased to the same classes. Let's try one more time, isolating these two classes:
+Without the zero entries, our classification separator looks better fit, but still biased to the same classes. Let's try one more time, isolating these two classes:
 ```r
 genre_idxs <- which(head(data_rnd$genre, 4000) %in% c("Comedy", "Drama"))
 data_for_svm <- data.frame(X1 = as.matrix(data_container_tfidf@training_matrix)[genre_idxs, 1111], X2 = as.matrix(data_container_tfidf@training_matrix)[genre_idxs, 1231], y = as.factor(data_rnd$genre[genre_idxs]))
@@ -385,7 +387,7 @@ mtext(side = 3, text = "Linear, comedies/dramas, non-zero records", line = 0.6)
 ```
 ![SVM classification plot, linear, comedies/dramas, non-zero records](/graphs/plot-linear-cd-nzr.png)
 
-Although easier to read, results are basically identical. So what happens when we use a non-linear Gaussian function?
+We can confirm now that our data is definitely being biased to these two classes. Although the background shading is easier to distinguish, results are basically identical. So what happens when we use a non-linear Gaussian function?
 ```r
 data_for_svm_fit = svm(factor(y) ~ ., data = data_for_svm, scale = FALSE, kernel = "radial", cost = 10)
 plot(data_for_svm_fit, data_for_svm)
@@ -483,14 +485,18 @@ SVM_PRECISION    SVM_RECALL    SVM_FSCORE
 FALSE  TRUE 
  1002   363
 ```
-With our balanced data set, we achieved a precision and recall of approximately 26%, an improvement over our unbalanced classes, but an overall accuracy of just under 27%, which is worse. We can speculate that the predominance of classes 5 and 8 in our regular data set was actually helping our model by increasing the probability that any given document would fall into one of these two classes, making predictions "easier". With 23 even classes, any random guess has a lower probability of being true.
+With our balanced data set, we achieved a precision and recall of approximately 26%, an improvement over our unbalanced classes, but an overall accuracy of just under 27%, which is worse. So what could cause this? We can speculate that the predominance of classes 5 and 8 in our regular data set was actually helping our model by increasing the probability that any given document would fall into one of these two classes, making predictions "easier". With 23 even classes, any random guess has a lower probability of being true.
+
+To better understand this, imagine that I'm playing a guessing game while blindfolded. I'm pulling jelly beans out of a big bowl and trying to guess their color, but I'm terrible at guessing so I always say red. Now if this bowl has 10 jelly beans each of a different color, then I only have a 1 in 10, or 10% chance of being correct. If, on the other hand, the bowl has 8 red jelly beans, 1 blue jelly bean and 1 green jelly bean, then suddenly I'll have an 8 in 10, or 80% chance of being correct. My color-picking skill hasn't actually improved any, I just have better chances of getting lucky. Thus the importance of balanced data.
 
 ![Heatmap for Balanced SVM Linear Model](/graphs/heatmap-svm-linear-balanced.png)
 
 These are interesting results, but still not particularly useful. Given that SVM works best with two classes, and that our data might be *too* sparse for meaningful results, it may simply be that our data might be better suited to another model. So let's find out!
 
 ### LogitBoost
-Another popular algorithm is LogitBoost, which claims to be less sensitive to outlier data than the algorithm on which it is based, AdaBoost, which takes an iterative voting-based methodology to classification. Let's look at its performance in more detail.
+Another popular algorithm is LogitBoost, which claims to be less sensitive to outlier data than the algorithm on which it is based, AdaBoost, which takes an iterative voting-based methodology to classification. Outliers are generally unwelcome in statistics because they can skew the data towards them, and so best efforts should be made in excluding them.
+
+Is our data prone to outliers and will Logitboost's insensitivity to them help our classification? Let's look at its performance in more detail and find out.
 
 ##### Manual Modelling
 ```r
@@ -571,9 +577,9 @@ classification. The class with the most votes "wins". However, with this scheme 
 two cases have a tie (the same number of votes), especially if number of iterations is even. In that
 case NA is returned, instead of a label.
 
-Well now, earlier we'll recall observing a document that was had an equal probabability of falling into one of two classes, and no decision was made. In these cases, LogitBoost will simply deem the result inconclusive. For our data, 701 documents were discarded as such, which is certainly not ideal!
+Well now, earlier we'll recall observing a document that had an equal probabability of falling into one of two classes, and no decision was made. In these cases, LogitBoost will simply deem the result inconclusive. For our data, 701 documents were discarded as such, which is certainly not ideal!
 
-However, increased iterations is likely to reduce the likelihood of a tie, so let's increase the iterations to 20 and try again:
+As was mentioned earlier, this algorithm takes an iterative voting approach to classification, which means that is uses [Backpropagation](https://en.wikipedia.org/wiki/Backpropagation) to improve its results. In layman's terms, it measures and compares its errors levels through each training iteration and adjusts the parameters to adjust and compensate. In our example, each extra iteration should reduce the likelihood of a tie, so let's increase the iterations to 20 and try again:
 ```text
 boost_scores  1  2  3  4  5  6  7  8  9 10 11 13 14 15 16 17 18 19 20 21 22 23 24 25
           1   3  0  0  0  0  1  0  0  0  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0
@@ -599,7 +605,7 @@ boost_scores  1  2  3  4  5  6  7  8  9 10 11 13 14 15 16 17 18 19 20 21 22 23 2
           24  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0
           25  0  0  1  0  1  0  0  3  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 10
 ```
-Here we see better representation among the classes, with slightly more documents being classified, but our overall result of 97 of 342 documents, or 28%, is actually a regression in our accuracy. Is it likely that more iterations would lead to more classifications but lower accuracy? More testing would be required to confirm that hypothesis.
+Here we see better representation among the classes, with slightly more documents being classified, but our overall result of 97 of 342 documents, or 28%, is actually a deterioration in our accuracy. Is it likely that more iterations would lead to more classifications but lower accuracy? More testing will be required to confirm that hypothesis.
 
 ##### Assisted Modelling
 Perhaps RTextTools does a better job of optimizing algorithms. Let's examine its results more closely:
@@ -771,7 +777,7 @@ Testing a number of our algorithms using 5-fold cross-validation, we achieve the
 
 ![5-fold Cross-Validation Results](/graphs/cf-results.png)
 
-While the last four algorithms all perform roughly equivalently to their random data testing performance, the first four showed noticeable differences. LogitBoost, GLMNet and MaxEnt may all be good examples of *over-fitting*. That is, because the models are too strongly fit around the training data, they test extremely well on this same data, but poorly on any new data that was previously unseen. Tree, on the other hand, may be a case of mild underfitting, essentially the opposite problem.
+While the last four algorithms all perform roughly equivalently to their random data testing performance, the first four showed noticeable differences. LogitBoost, GLMNet and MaxEnt may all be good examples of *over-fitting*. That is, because the models are too strongly fit around the training data, they test extremely well on this same data, but poorly on any new data that was previously unseen. Neural Network, on the other hand, may be a case of mild underfitting, essentially the opposite problem.
 
 ### Conclusion
 
@@ -779,7 +785,7 @@ Multiclass classification is a challenging process, all the more so when combine
 
 With enough training records, it may be possible to increase the overall accuracy to a level which would be useful for practical predictions. However, the law of diminishing returns is likely to apply once a certain threshold is reached. In some cases, we also observed certain algorithms, such as Maximum Entropy, beginning to perform worse with extremely large training sets, suggesting that plateauing is a likely outcome.
 
-Ultimately, with our data in its current state, automatic classification of genre based on plot may not achievable. That said, re-examing and restructuring the data would be a better approach towards achieving better accuracy. With adjusted sparsity, as well as the possible inclusion of additional features unrelated to plot, it may be possible to build a high-performing model. Further experimentation is needed.
+Ultimately, with our data in its current state, automatic classification of genre based on plot may not be achievable. That said, re-examining and restructuring the data would be a better approach towards achieving better accuracy. With adjusted sparsity, as well as the possible inclusion of additional features unrelated to plot, it may be possible to build a high-performing model. Further experimentation is needed.
 
 ### Further Research
 
@@ -790,7 +796,7 @@ The following tasks may be worth pursuing to further improve results:
 * Attempt different block sizes and determine affect on results.
 * Score and include movie title to modelling to determine impact on weighing.
 * Include additional non-semantic features, including movie length, year, and so forth to determine their relevance.
-* Test Generalized Linear Models *(GLMNet)* with 16,000 records, which failed during my tests.
+* Test Generalized Linear Models *(GLMNet)* with 16,000 records, which requires more than 16GB of RAM and failed during my tests.
 * Investigate e1071's [tune](http://www.inside-r.org/packages/cran/e1071/docs/tune) function.
 
 ### Reference R Library Manuals
