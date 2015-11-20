@@ -397,6 +397,7 @@ mtext(side = 3, text = "Gaussian, comedies/dramas, non-zero records", line = 0.6
 
 There is a negligable difference in performance, as we saw in our results earlier. Note that further refinements could be made by adjusting the cost factor *C*, the gamma and other kernel parameters that are typically optimized by the automated training functions.
 
+##### Receiver operating characteristic
 However, now that we are only working with two classes, our model is a traditional binary classification problem and we can perform our classification to plot the area under the curve (AUC) using the *ROCR* R library, and visualize our results:
 ```r
 library(ROCR)
