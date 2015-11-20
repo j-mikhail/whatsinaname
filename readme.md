@@ -376,7 +376,7 @@ mtext(side = 3, text = "Linear, all genres, non-zero records", line = 0.6)
 ```
 ![SVM classification plot, linear, all genres, non-zero records](/graphs/plot-linear-allg-nzr.png)
 
-Without the zero entries, our classification separator looks better fit, but still biased to the same classes. Let's try one more time, isolating these two classes:
+Without the zero entries, our classification separator looks like a better fit, but is still biased to the same classes. Let's try one more time, isolating our suspected classes:
 ```r
 genre_idxs <- which(head(data_rnd$genre, 4000) %in% c("Comedy", "Drama"))
 data_for_svm <- data.frame(X1 = as.matrix(data_container_tfidf@training_matrix)[genre_idxs, 1111], X2 = as.matrix(data_container_tfidf@training_matrix)[genre_idxs, 1231], y = as.factor(data_rnd$genre[genre_idxs]))
@@ -419,7 +419,7 @@ data_for_svm_pred Comedy Drama
 
 ![ROC for SVM Linear Binary Model](/graphs/roc-svm-linear-binary.png)
 
-Our overall accuracy is now approximately 57%, however random chance is now 50% which makes our performance only marginally better, as can be seen on the ROC curve, with the gray line representing random chance.
+Our overall accuracy is now approximately 57%, however random chance is now about 50% which makes our performance only marginally better, as can be seen on the ROC curve, with the gray line representing random chance.
 
 At any rate, while this exercise has given us interesting insights from an academic perspective, it doesn't ultimately help us achieve our multiclass classification objectives. So how can we improve our results?
 
@@ -579,7 +579,7 @@ case NA is returned, instead of a label.
 
 Well now, earlier we'll recall observing a document that had an equal probabability of falling into one of two classes, and no decision was made. In these cases, LogitBoost will simply deem the result inconclusive. For our data, 701 documents were discarded as such, which is certainly not ideal!
 
-As was mentioned earlier, this algorithm takes an iterative voting approach to classification, which means that is uses [Backpropagation](https://en.wikipedia.org/wiki/Backpropagation) to improve its results. In layman's terms, it measures and compares its errors levels through each training iteration and adjusts the parameters to adjust and compensate. In our example, each extra iteration should reduce the likelihood of a tie, so let's increase the iterations to 20 and try again:
+LogitBoost's "voting scheme" essentially means that is uses [Backpropagation](https://en.wikipedia.org/wiki/Backpropagation) to improve its results. In layman's terms, it measures and compares its errors levels through each training iteration and adjusts the parameters to adjust and compensate. In our example, each extra iteration should reduce the likelihood of a tie, so let's increase the iterations to 20 and try again:
 ```text
 boost_scores  1  2  3  4  5  6  7  8  9 10 11 13 14 15 16 17 18 19 20 21 22 23 24 25
           1   3  0  0  0  0  1  0  0  0  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0
