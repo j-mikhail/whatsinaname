@@ -492,7 +492,7 @@ To better understand this, imagine that I'm playing a guessing game while blindf
 
 ![Heatmap for Balanced SVM Linear Model](/graphs/heatmap-svm-linear-balanced.png)
 
-These are interesting results, but still not particularly useful. Given that SVM works best with two classes, and that our data might be *too* sparse for meaningful results, it may simply be that our data might be better suited to another model. So let's find out!
+We can clearly observe that misclassifications are no longer concentrated in classes 5 and 8, but rather distributed across all classes. These are interesting results, but still not particularly useful. Given that SVM works best with two classes, and that our data might be *too* sparse for meaningful results, it may simply be that our data might be better suited to another model. So let's find out!
 
 ### LogitBoost
 Another popular algorithm is LogitBoost, which claims to be less sensitive to outlier data than the algorithm on which it is based, AdaBoost, which takes an iterative voting-based methodology to classification. Outliers are generally unwelcome in statistics because they can skew the data towards them, and so best efforts should be made in excluding them.
